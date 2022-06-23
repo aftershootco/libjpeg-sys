@@ -1,0 +1,17 @@
+[package]
+name = "libjpeg-sys"
+description = "Builds and links libjpeg(-turbo)"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+links = "libjpeg"
+
+[dependencies]
+
+[build-dependencies]
+cmake = { version = "0.1.48", optional = true }
+
+[features]
+default = ["build"] 
+build = ["dep:cmake", "clone"]
+clone = []
