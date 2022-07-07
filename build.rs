@@ -6,11 +6,14 @@ pub fn main() -> Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     // let out_dir = Path::new(&out_dir_);
 
-    #[cfg(feature = "clone")]
+    // #[cfg(feature = "clone")]
+    #[cfg(all(feature = "clone", not(feature = "no-build")))]
     clone(&out_dir)?;
-    #[cfg(feature = "build")]
+    // #[cfg(feature = "build")]
+    #[cfg(all(feature = "build", not(feature = "no-build")))]
     build(&out_dir)?;
 
+    #[cfg(not(feature = "no-build"))]
     println!(
         "cargo:include={}",
         concat!(env!("CARGO_MANIFEST_DIR"), "/include")
@@ -19,7 +22,7 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "clone")]
+#[cfg(all(feature = "clone", not(feature = "no-build")))]
 fn clone(our_dir: impl AsRef<Path>) -> Result<()> {
     use std::process::{Command, Stdio};
     eprintln!("\x1b[31mCloning libjpeg");
@@ -43,6 +46,7 @@ fn clone(our_dir: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(all(feature = "build", not(feature = "no-build")))]
 pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     use cmake::Config;
 
