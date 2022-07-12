@@ -4,7 +4,6 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub fn main() -> Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    // let out_dir = Path::new(&out_dir_);
 
     #[cfg(all(feature = "clone", not(feature = "no-build")))]
     clone(&out_dir)?;
@@ -148,10 +147,14 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     // libjpeg.file("libjpeg/wrppm.c");
     // libjpeg.file("libjpeg/wrtarga.c");
     // libjpeg.compile("jpeg");
+    // println!(
+    //     "cargo:rustc-link-search=native={}",
+    //     out_dir.as_ref().join("lib").display()
+    // );
 
     println!(
         "cargo:rustc-link-search=native={}",
-        out_dir.as_ref().join("lib").display()
+        libjpeg.join("lib").display()
     );
     println!("cargo:rustc-link-lib=static=jpeg");
 
