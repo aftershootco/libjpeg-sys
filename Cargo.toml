@@ -9,6 +9,7 @@ links = "libjpeg"
 [dependencies]
 
 [build-dependencies]
+cc = "1.0.73"
 cmake = { version = "0.1.48", optional = true }
 
 [features]
