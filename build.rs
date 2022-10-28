@@ -54,6 +54,7 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     let libjpeg = Config::new("libjpeg")
         .generator("Unix Makefiles")
         .define("ENABLE_SHARED", "OFF")
+        .define("RELATIVE_PATH", out_dir.as_ref().join("libjpeg"))
         .define("ENABLE_STATIC", "ON")
         .define("WITH_JPEG8", "ON")
         .define("WITH_JPEG7", "ON")
@@ -154,7 +155,7 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
 
     println!(
         "cargo:rustc-link-search=native={}",
-        libjpeg.join("lib").display()
+        libjpeg.join("build").display()
     );
     println!("cargo:rustc-link-lib=static=jpeg");
 
