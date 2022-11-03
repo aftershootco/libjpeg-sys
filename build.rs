@@ -46,22 +46,60 @@ fn clone(our_dir: impl AsRef<Path>) -> Result<()> {
 
 #[cfg(all(feature = "build", not(feature = "no-build")))]
 pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
-    use cmake::Config;
+    use std::process::Command;
 
     std::env::set_current_dir(&out_dir)?;
     // std::fs::create_dir_all(out_dir.as_ref().join("build"))?;
 
-    let libjpeg = Config::new("libjpeg")
-        .generator("Unix Makefiles")
-        .define("ENABLE_SHARED", "OFF")
-        .define("RELATIVE_PATH", out_dir.as_ref().join("libjpeg"))
-        .define("ENABLE_STATIC", "ON")
-        .define("WITH_JPEG8", "ON")
-        .define("WITH_JPEG7", "ON")
-        .build();
+    // let libjpeg = Config::new("libjpeg")
+    //     .generator("Unix Makefiles")
+    //     .define("ENABLE_SHARED", "OFF")
+    //     .define("RELATIVE_PATH", out_dir.as_ref().join("libjpeg"))
+    //     .define("ENABLE_STATIC", "ON")
+    //     .define("WITH_JPEG8", "ON")
+    //     .define("WITH_JPEG7", "ON")
+    //     .build();
+
+    let libjpeg = Command::new("cmake")
+        .arg("-G")
+        .arg("Unix Makefiles")
+        .arg("-DENABLE_SHARED=OFF")
+        .arg("-DENABLE_STATIC=ON")
+        .arg("-DWITH_JPEG8=ON")
+        .arg("-DWITH_JPEG7=ON")
+        .arg("libjpeg")
+        .arg("-Blibjpeg")
+        .output()?;
+
+    if !libjpeg.status.success() {
+        return Err(format!(
+            "Failed to configure libjpeg: {}",
+            String::from_utf8_lossy(&libjpeg.stderr)
+        )
+        .into());
+    }
+
+    let libjpeg_build = Command::new("cmake")
+        .arg("--build")
+        .arg(".")
+        .arg("-j")
+        .arg(std::thread::available_parallelism()?.to_string())
+        .output()?;
+    if !libjpeg_build.status.success() {
+        return Err(format!(
+            "Failed to build libjpeg: {}",
+            String::from_utf8_lossy(&libjpeg_build.stderr)
+        )
+        .into());
+    }
 
     // let mut libjpeg = cc::Build::new();
     // libjpeg.include("libjpeg");
+    // libjpeg.cpp(false);
+
+    // libjpeg.include("libjpeg/");
+    // // libjpeg.file("libjpeg/jconfigint.h");
+    // libjpeg.define("INLINE", "__inline__ __attribute__((always_inline))");
     // libjpeg.file("libjpeg/cdjpeg.c");
     // libjpeg.file("libjpeg/cjpeg.c");
     // libjpeg.file("libjpeg/djpeg.c");
@@ -148,15 +186,15 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     // libjpeg.file("libjpeg/wrppm.c");
     // libjpeg.file("libjpeg/wrtarga.c");
     // libjpeg.compile("jpeg");
-    // println!(
-    //     "cargo:rustc-link-search=native={}",
-    //     out_dir.as_ref().join("lib").display()
-    // );
-
     println!(
         "cargo:rustc-link-search=native={}",
-        libjpeg.join("build").display()
+        out_dir.as_ref().join("lib").display()
     );
+
+    // println!(
+    //     "cargo:rustc-link-search=native={}",
+    //     libjpeg.join("build").display()
+    // );
     println!("cargo:rustc-link-lib=static=jpeg");
 
     Ok(())
