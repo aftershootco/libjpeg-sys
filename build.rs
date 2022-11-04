@@ -27,14 +27,24 @@ fn clone(our_dir: impl AsRef<Path>) -> Result<()> {
     let libjpeg_repo_url = std::env::var("LIBJPEG_REPO")
         .unwrap_or_else(|_| String::from("https://github.com/libjpeg-turbo/libjpeg-turbo"));
 
-    let _git_out = Command::new("git")
-        .arg("clone")
-        .arg("--depth")
-        .arg("1")
-        .arg(&libjpeg_repo_url)
-        .arg(our_dir.as_ref().join("libjpeg"))
-        .stdout(Stdio::inherit())
-        .output()?;
+    if our_dir.as_ref().join("libjpeg").exists() {
+        eprintln!("libjpeg already exists, skipping clone");
+    } else {
+        let _git_out = Command::new("git")
+            .arg("clone")
+            .arg("--depth")
+            .arg("1")
+            .arg(&libjpeg_repo_url)
+            .arg(our_dir.as_ref().join("libjpeg"))
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .output()?;
+
+        if !_git_out.status.success() {
+            eprintln!("\x1b[31mFailed to clone libjpeg");
+            return Err("Failed to clone libjpeg".into());
+        }
+    }
 
     println!(
         "cargo:include={}",
@@ -69,6 +79,7 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
         .arg("-DWITH_JPEG7=ON")
         .arg("libjpeg")
         .arg("-Blibjpeg")
+        .stdout(std::process::Stdio::inherit())
         .output()?;
 
     if !libjpeg.status.success() {
@@ -81,7 +92,7 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
 
     let libjpeg_build = Command::new("cmake")
         .arg("--build")
-        .arg(".")
+        .arg("libjpeg")
         .arg("-j")
         .arg(std::thread::available_parallelism()?.to_string())
         .output()?;
@@ -188,7 +199,7 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     // libjpeg.compile("jpeg");
     println!(
         "cargo:rustc-link-search=native={}",
-        out_dir.as_ref().join("lib").display()
+        out_dir.as_ref().join("libjpeg").display()
     );
 
     // println!(
