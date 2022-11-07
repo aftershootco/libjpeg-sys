@@ -11,9 +11,12 @@ links = "libjpeg"
 [build-dependencies]
 cc = "1.0.73"
 cmake = { version = "0.1.48", optional = true }
+bindgen = { version = "0.60.1", optional = true }
+
 
 [features]
-default = ["build"] 
+default = ["build", "bindgen"] 
 build = ["dep:cmake", "clone"]
 no-build = ["build"]
 clone = []
+bindgen = ["dep:bindgen", "clone"]

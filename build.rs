@@ -4,12 +4,16 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub fn main() -> Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
+    println!("{:?}", out_dir);
 
     #[cfg(all(feature = "clone", not(feature = "no-build")))]
     clone(&out_dir)?;
 
     #[cfg(all(feature = "build", not(feature = "no-build")))]
     build(&out_dir)?;
+
+    #[cfg(all(feature = "bindgen", not(feature = "no-build")))]
+    bindings(&out_dir)?;
 
     #[cfg(not(feature = "no-build"))]
     println!(
@@ -46,6 +50,8 @@ fn clone(our_dir: impl AsRef<Path>) -> Result<()> {
 
 #[cfg(all(feature = "build", not(feature = "no-build")))]
 pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
+    use std::process::Command;
+
     use cmake::Config;
 
     std::env::set_current_dir(&out_dir)?;
@@ -162,6 +168,36 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
         libjpeg.join("lib").display()
     );
     println!("cargo:rustc-link-lib=static=jpeg");
+
+    Ok(())
+}
+
+
+#[cfg(feature = "bindgen")]
+fn bindings(out_dir: impl AsRef<Path>) -> Result<()> {
+    let out_dir = out_dir.as_ref();
+
+    std::env::set_current_dir(out_dir).expect("Unable to set current dir");
+    println!("cargo:include={}", out_dir.join("libjpeg").join("libjpeg").display());
+
+    let bindings = bindgen::Builder::default()
+    //.clang_arg("-I/Library/Developer/CommandLineTools/usr/include/c++/v1/")
+    //.clang_arg("-I/Library/Developer/CommandLineTools/usr/include/c++/v1/")
+    //.header("include/jconfig.h")
+    .header("include/jpeglib.h")
+    .use_core()
+    .ctypes_prefix("libc")
+    .generate_comments(true)
+    .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+    .derive_eq(true)
+    .size_t_is_usize(true)
+    .blocklist_function("_.*")
+    .generate()
+    .expect("failed to generate bindings");
+
+    bindings
+    .write_to_file(out_dir.join("bindings.rs"))
+    .expect("Couldn't write bindings!");
 
     Ok(())
 }
