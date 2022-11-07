@@ -175,15 +175,17 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
 
 #[cfg(feature = "bindgen")]
 fn bindings(out_dir: impl AsRef<Path>) -> Result<()> {
+
     let out_dir = out_dir.as_ref();
 
     std::env::set_current_dir(out_dir).expect("Unable to set current dir");
     println!("cargo:include={}", out_dir.join("libjpeg").join("libjpeg").display());
 
+
     let bindings = bindgen::Builder::default()
     //.clang_arg("-I/Library/Developer/CommandLineTools/usr/include/c++/v1/")
-    //.clang_arg("-I/Library/Developer/CommandLineTools/usr/include/c++/v1/")
-    //.header("include/jconfig.h")
+    .header("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stddef.h")
+    .header("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdio.h")
     .header("include/jpeglib.h")
     .use_core()
     .ctypes_prefix("libc")
