@@ -203,6 +203,7 @@ dependencies = [
  "bindgen",
  "cc",
  "cmake",
+ "libc",
 ]
 
 [[package]]

@@ -7,6 +7,7 @@ license = "MIT"
 links = "libjpeg"
 
 [dependencies]
+libc = "0.2.137"
 
 [build-dependencies]
 cc = "1.0.73"
