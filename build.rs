@@ -186,6 +186,7 @@ fn bindings(out_dir: impl AsRef<Path>) -> Result<()> {
     //.clang_arg("-I/Library/Developer/CommandLineTools/usr/include/c++/v1/")
     .header("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stddef.h")
     .header("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdio.h")
+    .header("include/jconfig.h")
     .header("include/jpeglib.h")
     .use_core()
     .ctypes_prefix("libc")
