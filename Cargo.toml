@@ -10,10 +10,10 @@ links = "libjpeg"
 
 [build-dependencies]
 cc = "1.0.73"
-cmake = { version = "0.1.48", optional = true }
+itoa = "1.0.4"
 
 [features]
 default = ["build"] 
-build = ["dep:cmake", "clone"]
-no-build = ["build"]
+build = ["clone"]
+no-build = []
 clone = []
