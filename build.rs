@@ -55,18 +55,16 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     let mut libjpeg = cc::Build::new();
 
     libjpeg.include("configured");
-    let mut libjpeg = configure_jconfigint(libjpeg)?;
+    let libjpeg = configure_jconfigint(libjpeg)?;
+    let libjpeg = configure_jversion(libjpeg)?;
+    let mut libjpeg = configure_jconfig(libjpeg)?;
 
-    libjpeg.include("libjpeg");
-    libjpeg.file("libjpeg/cdjpeg.c");
-    libjpeg.file("libjpeg/cjpeg.c");
-    libjpeg.file("libjpeg/djpeg.c");
-    libjpeg.file("libjpeg/jaricom.c");
+    // libjpeg.file("libjpeg/jpeglib.h");
+    // std::fs::write("/tmp/file.txt", libjpeg.expand())?;
+
     libjpeg.file("libjpeg/jcapimin.c");
     libjpeg.file("libjpeg/jcapistd.c");
-    libjpeg.file("libjpeg/jcarith.c");
     libjpeg.file("libjpeg/jccoefct.c");
-    libjpeg.file("libjpeg/jccolext.c");
     libjpeg.file("libjpeg/jccolor.c");
     libjpeg.file("libjpeg/jcdctmgr.c");
     libjpeg.file("libjpeg/jchuff.c");
@@ -80,18 +78,12 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     libjpeg.file("libjpeg/jcphuff.c");
     libjpeg.file("libjpeg/jcprepct.c");
     libjpeg.file("libjpeg/jcsample.c");
-    libjpeg.file("libjpeg/jcstest.c");
     libjpeg.file("libjpeg/jctrans.c");
     libjpeg.file("libjpeg/jdapimin.c");
     libjpeg.file("libjpeg/jdapistd.c");
-    libjpeg.file("libjpeg/jdarith.c");
-    libjpeg.file("libjpeg/jdatadst-tj.c");
     libjpeg.file("libjpeg/jdatadst.c");
-    libjpeg.file("libjpeg/jdatasrc-tj.c");
     libjpeg.file("libjpeg/jdatasrc.c");
     libjpeg.file("libjpeg/jdcoefct.c");
-    libjpeg.file("libjpeg/jdcol565.c");
-    libjpeg.file("libjpeg/jdcolext.c");
     libjpeg.file("libjpeg/jdcolor.c");
     libjpeg.file("libjpeg/jddctmgr.c");
     libjpeg.file("libjpeg/jdhuff.c");
@@ -101,8 +93,6 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     libjpeg.file("libjpeg/jdmarker.c");
     libjpeg.file("libjpeg/jdmaster.c");
     libjpeg.file("libjpeg/jdmerge.c");
-    libjpeg.file("libjpeg/jdmrg565.c");
-    libjpeg.file("libjpeg/jdmrgext.c");
     libjpeg.file("libjpeg/jdphuff.c");
     libjpeg.file("libjpeg/jdpostct.c");
     libjpeg.file("libjpeg/jdsample.c");
@@ -115,34 +105,15 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     libjpeg.file("libjpeg/jidctfst.c");
     libjpeg.file("libjpeg/jidctint.c");
     libjpeg.file("libjpeg/jidctred.c");
-    libjpeg.file("libjpeg/jmemmgr.c");
-    libjpeg.file("libjpeg/jmemnobs.c");
-    libjpeg.file("libjpeg/jpegtran.c");
     libjpeg.file("libjpeg/jquant1.c");
     libjpeg.file("libjpeg/jquant2.c");
-    libjpeg.file("libjpeg/jsimd_none.c");
-    libjpeg.file("libjpeg/jstdhuff.c");
     libjpeg.file("libjpeg/jutils.c");
-    libjpeg.file("libjpeg/rdbmp.c");
-    libjpeg.file("libjpeg/rdcolmap.c");
-    libjpeg.file("libjpeg/rdgif.c");
-    libjpeg.file("libjpeg/rdjpgcom.c");
-    libjpeg.file("libjpeg/rdppm.c");
-    libjpeg.file("libjpeg/rdswitch.c");
-    libjpeg.file("libjpeg/rdtarga.c");
-    libjpeg.file("libjpeg/strtest.c");
-    libjpeg.file("libjpeg/tjbench.c");
-    libjpeg.file("libjpeg/tjexample.c");
-    libjpeg.file("libjpeg/tjunittest.c");
-    libjpeg.file("libjpeg/tjutil.c");
-    libjpeg.file("libjpeg/transupp.c");
-    libjpeg.file("libjpeg/turbojpeg-jni.c");
-    libjpeg.file("libjpeg/turbojpeg.c");
-    libjpeg.file("libjpeg/wrbmp.c");
-    libjpeg.file("libjpeg/wrgif.c");
-    libjpeg.file("libjpeg/wrjpgcom.c");
-    libjpeg.file("libjpeg/wrppm.c");
-    libjpeg.file("libjpeg/wrtarga.c");
+    libjpeg.file("libjpeg/jmemmgr.c");
+    libjpeg.file("libjpeg/jmemnobs.c");
+    // libjpeg.file("libjpeg/jsimd.c");
+
+    libjpeg.include("libjpeg");
+
     libjpeg.compile("jpeg");
     println!(
         "cargo:rustc-link-search=native={}",
@@ -172,7 +143,6 @@ impl FromStr for JpegLib {
         match s {
             "jpeg8" => Ok(JpegLib::Jpeg8),
             "jpeg7" => Ok(JpegLib::Jpeg7),
-            "jpeg6" => Ok(JpegLib::Jpeg6),
             _ => Err(format!("Unknown jpeg lib: {}", s)),
         }
     }
@@ -196,6 +166,15 @@ fn version() -> Result<String> {
     }
     Err("Unable to get version from CMakeLists.txt".into())
 }
+
+fn turbo_version() -> Result<(u32, u32, u32)> {
+    let v = version()?;
+    Ok(v.split('.')
+        .map(|s| s.parse::<u32>())
+        .collect::<Result<Vec<_>, _>>()
+        .map(|v| (v[0], v[1], v[2]))?)
+}
+
 fn jpeg_lib_version() -> Result<u32> {
     let jpeg8 = env("WITH_JPEG8", 0_u8);
     let jpeg7 = env("WITH_JPEG7", 0_u8);
@@ -209,13 +188,62 @@ fn jpeg_lib_version() -> Result<u32> {
     }
 }
 
-fn jversion(mut libjpeg: cc::Build) -> Result<cc::Build> {
+fn configure_jversion(mut libjpeg: cc::Build) -> Result<cc::Build> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let jversion = std::path::PathBuf::from(out_dir)
         .join("libjpeg")
         .join("jversion.h");
 
+    let jpeg_lib_version = jpeg_lib_version()?;
+    match jpeg_lib_version {
+        x if x >= 80 => {
+            libjpeg.define("JVERSION", "\"8d  15-Jan-2012\"");
+        }
+        x if x >= 70 => {
+            libjpeg.define("JVERSION", "\"7  27-Jun-2009\"");
+        }
+        _ => {
+            libjpeg.define("JVERSION", "\"6b  27-Mar-1998\"");
+        }
+    }
+    // #define JCOPYRIGHT \
+    //   "Copyright (C) 2009-2022 D. R. Commander\n" \
+    //   "Copyright (C) 2015, 2020 Google, Inc.\n" \
+    //   "Copyright (C) 2019-2020 Arm Limited\n" \
+    //   "Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
+    //   "Copyright (C) 2011-2016 Siarhei Siamashka\n" \
+    //   "Copyright (C) 2015 Intel Corporation\n" \
+    //   "Copyright (C) 2013-2014 Linaro Limited\n" \
+    //   "Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
+    //   "Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
+    //   "Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
+    //   "Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
+    //   "Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
 
+    libjpeg.define(
+        "JCOPYRIGHT",
+        r#"
+"Copyright (C) 2009-2022 D. R. Commander\n" \
+"Copyright (C) 2015, 2020 Google, Inc.\n" \
+"Copyright (C) 2019-2020 Arm Limited\n" \
+"Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
+"Copyright (C) 2011-2016 Siarhei Siamashka\n" \
+"Copyright (C) 2015 Intel Corporation\n" \
+"Copyright (C) 2013-2014 Linaro Limited\n" \
+"Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
+"Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
+"Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
+"Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
+"Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
+"#,
+    );
+
+    libjpeg.define(
+        "JCOPYRIGHT_SHORT",
+        "\"Copyright (C) 1991-2020 The libjpeg-turbo Project and many others\"",
+    );
+
+    std::fs::write(jversion, "")?;
     Ok(libjpeg)
 }
 
@@ -237,9 +265,13 @@ fn configure_jconfigint(mut libjpeg: cc::Build) -> Result<cc::Build> {
         "SIZEOF_SIZE_T",
         itoa::Buffer::new().format(core::mem::size_of::<usize>()),
     );
-    libjpeg.define("PACKAGE_NAME", env!("CARGO_PKG_NAME"));
-    libjpeg.define("VERSION", version()?.as_str());
+    libjpeg.define("PACKAGE_NAME", concat!("\"", env!("CARGO_PKG_NAME"), "\""));
+    libjpeg.define("VERSION", format!("\"{}\"", version()?).as_str());
+    libjpeg.define("BUILD", format!("\"{}\"", "HELLO").as_str());
     let have_intin_h = try_build_c("#include <intrin.h>")?;
+    if have_intin_h {
+        libjpeg.define("HAVE_INTRIN_H", None);
+    }
     if compiler.is_like_msvc() && have_intin_h {
         if core::mem::size_of::<usize>() == 8 {
             libjpeg.define("HAVE__BITSCANFORWARD", None);
@@ -247,8 +279,7 @@ fn configure_jconfigint(mut libjpeg: cc::Build) -> Result<cc::Build> {
             libjpeg.define("HAVE__BITSCANFORWARD64", None);
         }
     }
-    let fallthrough = try_expand_c(
-        r##"
+    let fallthrough = r##"
 #if defined(__has_attribute)
 #if __has_attribute(fallthrough)
 #define FALLTHROUGH  __attribute__((fallthrough));
@@ -258,10 +289,39 @@ fn configure_jconfigint(mut libjpeg: cc::Build) -> Result<cc::Build> {
 #else
 #define FALLTHROUGH
 #endif
-"##,
-    )?;
+"##;
     std::fs::write(jconfigint, fallthrough.as_bytes())?;
 
+    Ok(libjpeg)
+}
+
+fn configure_jconfig(mut libjpeg: cc::Build) -> Result<cc::Build> {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let jconfig = std::path::PathBuf::from(out_dir)
+        .join("libjpeg")
+        .join("jconfig.h");
+    let jpeg_lib_version = jpeg_lib_version()?;
+    libjpeg.define(
+        "JPEG_LIB_VERSION",
+        itoa::Buffer::new().format(jpeg_lib_version),
+    );
+    libjpeg.define("LIBJPEG_TURBO_VERSION", version()?.as_str());
+    let turbo_version = turbo_version()?;
+    libjpeg.define(
+        "LIBJPEG_TURBO_VERSION_NUMBER",
+        format!(
+            "\"{}{:0>3}{:0>3}\"",
+            turbo_version.0, turbo_version.1, turbo_version.2
+        )
+        .as_str(),
+    );
+    libjpeg.define("BITS_IN_JSAMPLE", "8");
+    std::fs::write(
+        jconfig,
+        "",
+        // b"#define MAXJSAMPLE 255
+        //                       typedef short JSAMPLE;",
+    )?;
     Ok(libjpeg)
 }
 
@@ -271,6 +331,7 @@ fn inline(compiler: &cc::Tool, force_inline: bool) -> Result<&'static str> {
     } else {
         vec!["__inline__;inline"]
     };
+
     if force_inline {
         if compiler.is_like_msvc() {
             inline.insert(0, "__forceinline");
