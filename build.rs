@@ -55,9 +55,9 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     let mut libjpeg = cc::Build::new();
 
     libjpeg.include("configured");
-    let libjpeg = configure_jconfigint(libjpeg)?;
-    let libjpeg = configure_jversion(libjpeg)?;
-    let mut libjpeg = configure_jconfig(libjpeg)?;
+    let libjpeg = compile::configure_jconfigint(libjpeg)?;
+    let libjpeg = compile::configure_jversion(libjpeg)?;
+    let mut libjpeg = compile::configure_jconfig(libjpeg)?;
 
     // libjpeg.file("libjpeg/jpeglib.h");
     // std::fs::write("/tmp/file.txt", libjpeg.expand())?;
@@ -129,100 +129,103 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
-pub enum JpegLib {
-    Jpeg8,
-    Jpeg7,
-    Other,
-}
+#[cfg(all(feature = "build", not(feature = "no-build")))]
+mod compile {
+    use super::*;
+    #[derive(Clone, Copy, Eq, PartialEq, Debug)]
+    pub enum JpegLib {
+        Jpeg8,
+        Jpeg7,
+        Other,
+    }
 
-impl FromStr for JpegLib {
-    type Err = String;
+    impl FromStr for JpegLib {
+        type Err = String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "jpeg8" => Ok(JpegLib::Jpeg8),
-            "jpeg7" => Ok(JpegLib::Jpeg7),
-            _ => Err(format!("Unknown jpeg lib: {}", s)),
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "jpeg8" => Ok(JpegLib::Jpeg8),
+                "jpeg7" => Ok(JpegLib::Jpeg7),
+                _ => Err(format!("Unknown jpeg lib: {}", s)),
+            }
         }
     }
-}
 
-fn version() -> Result<String> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let file = BufReader::new(File::open(
-        std::path::PathBuf::from(out_dir)
+    pub fn version() -> Result<String> {
+        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let file = BufReader::new(File::open(
+            std::path::PathBuf::from(out_dir)
+                .join("libjpeg")
+                .join("CMakeLists.txt"),
+        )?);
+        for line in file.lines().flatten() {
+            if line.starts_with("set(VERSION") {
+                return line
+                    .strip_prefix("set(VERSION ")
+                    .and_then(|s| s.strip_suffix(')'))
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| "Unable to get version from CMakeLists.txt".into());
+            }
+        }
+        Err("Unable to get version from CMakeLists.txt".into())
+    }
+
+    fn turbo_version() -> Result<(u32, u32, u32)> {
+        let v = version()?;
+        Ok(v.split('.')
+            .map(|s| s.parse::<u32>())
+            .collect::<Result<Vec<_>, _>>()
+            .map(|v| (v[0], v[1], v[2]))?)
+    }
+
+    fn jpeg_lib_version() -> Result<u32> {
+        let jpeg8 = env("WITH_JPEG8", 0_u8);
+        let jpeg7 = env("WITH_JPEG7", 0_u8);
+
+        if jpeg8 == 1 {
+            Ok(80)
+        } else if jpeg7 == 1 {
+            Ok(70)
+        } else {
+            Ok(62)
+        }
+    }
+
+    pub fn configure_jversion(mut libjpeg: cc::Build) -> Result<cc::Build> {
+        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let jversion = std::path::PathBuf::from(out_dir)
             .join("libjpeg")
-            .join("CMakeLists.txt"),
-    )?);
-    for line in file.lines().flatten() {
-        if line.starts_with("set(VERSION") {
-            return line
-                .strip_prefix("set(VERSION ")
-                .and_then(|s| s.strip_suffix(')'))
-                .map(|s| s.to_string())
-                .ok_or_else(|| "Unable to get version from CMakeLists.txt".into());
+            .join("jversion.h");
+
+        let jpeg_lib_version = jpeg_lib_version()?;
+        match jpeg_lib_version {
+            x if x >= 80 => {
+                libjpeg.define("JVERSION", "\"8d  15-Jan-2012\"");
+            }
+            x if x >= 70 => {
+                libjpeg.define("JVERSION", "\"7  27-Jun-2009\"");
+            }
+            _ => {
+                libjpeg.define("JVERSION", "\"6b  27-Mar-1998\"");
+            }
         }
-    }
-    Err("Unable to get version from CMakeLists.txt".into())
-}
+        // #define JCOPYRIGHT \
+        //   "Copyright (C) 2009-2022 D. R. Commander\n" \
+        //   "Copyright (C) 2015, 2020 Google, Inc.\n" \
+        //   "Copyright (C) 2019-2020 Arm Limited\n" \
+        //   "Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
+        //   "Copyright (C) 2011-2016 Siarhei Siamashka\n" \
+        //   "Copyright (C) 2015 Intel Corporation\n" \
+        //   "Copyright (C) 2013-2014 Linaro Limited\n" \
+        //   "Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
+        //   "Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
+        //   "Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
+        //   "Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
+        //   "Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
 
-fn turbo_version() -> Result<(u32, u32, u32)> {
-    let v = version()?;
-    Ok(v.split('.')
-        .map(|s| s.parse::<u32>())
-        .collect::<Result<Vec<_>, _>>()
-        .map(|v| (v[0], v[1], v[2]))?)
-}
-
-fn jpeg_lib_version() -> Result<u32> {
-    let jpeg8 = env("WITH_JPEG8", 0_u8);
-    let jpeg7 = env("WITH_JPEG7", 0_u8);
-
-    if jpeg8 == 1 {
-        Ok(80)
-    } else if jpeg7 == 1 {
-        Ok(70)
-    } else {
-        Ok(62)
-    }
-}
-
-fn configure_jversion(mut libjpeg: cc::Build) -> Result<cc::Build> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let jversion = std::path::PathBuf::from(out_dir)
-        .join("libjpeg")
-        .join("jversion.h");
-
-    let jpeg_lib_version = jpeg_lib_version()?;
-    match jpeg_lib_version {
-        x if x >= 80 => {
-            libjpeg.define("JVERSION", "\"8d  15-Jan-2012\"");
-        }
-        x if x >= 70 => {
-            libjpeg.define("JVERSION", "\"7  27-Jun-2009\"");
-        }
-        _ => {
-            libjpeg.define("JVERSION", "\"6b  27-Mar-1998\"");
-        }
-    }
-    // #define JCOPYRIGHT \
-    //   "Copyright (C) 2009-2022 D. R. Commander\n" \
-    //   "Copyright (C) 2015, 2020 Google, Inc.\n" \
-    //   "Copyright (C) 2019-2020 Arm Limited\n" \
-    //   "Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
-    //   "Copyright (C) 2011-2016 Siarhei Siamashka\n" \
-    //   "Copyright (C) 2015 Intel Corporation\n" \
-    //   "Copyright (C) 2013-2014 Linaro Limited\n" \
-    //   "Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
-    //   "Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
-    //   "Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
-    //   "Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
-    //   "Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
-
-    libjpeg.define(
-        "JCOPYRIGHT",
-        r#"
+        libjpeg.define(
+            "JCOPYRIGHT",
+            r#"
 "Copyright (C) 2009-2022 D. R. Commander\n" \
 "Copyright (C) 2015, 2020 Google, Inc.\n" \
 "Copyright (C) 2019-2020 Arm Limited\n" \
@@ -236,50 +239,50 @@ fn configure_jversion(mut libjpeg: cc::Build) -> Result<cc::Build> {
 "Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
 "Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
 "#,
-    );
+        );
 
-    libjpeg.define(
-        "JCOPYRIGHT_SHORT",
-        "\"Copyright (C) 1991-2020 The libjpeg-turbo Project and many others\"",
-    );
+        libjpeg.define(
+            "JCOPYRIGHT_SHORT",
+            "\"Copyright (C) 1991-2020 The libjpeg-turbo Project and many others\"",
+        );
 
-    std::fs::write(jversion, "")?;
-    Ok(libjpeg)
-}
+        std::fs::write(jversion, "")?;
+        Ok(libjpeg)
+    }
 
-fn configure_jconfigint(mut libjpeg: cc::Build) -> Result<cc::Build> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let jconfigint = std::path::PathBuf::from(out_dir)
-        .join("libjpeg")
-        .join("jconfigint.h");
-    let ctzl = try_build_c(
+    pub fn configure_jconfigint(mut libjpeg: cc::Build) -> Result<cc::Build> {
+        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let jconfigint = std::path::PathBuf::from(out_dir)
+            .join("libjpeg")
+            .join("jconfigint.h");
+        let ctzl = try_build_c(
         "int main(int argc, char **argv) { unsigned long a = argc;  return __builtin_ctzl(a); }",
     )?;
-    if ctzl {
-        libjpeg.define("HAVE_BUILTIN_CTZL", None);
-    }
-    let compiler = libjpeg.get_compiler();
-    let inline = inline(&compiler, env("FORCE_INLINE", true))?;
-    libjpeg.define("INLINE", inline);
-    libjpeg.define(
-        "SIZEOF_SIZE_T",
-        itoa::Buffer::new().format(core::mem::size_of::<usize>()),
-    );
-    libjpeg.define("PACKAGE_NAME", concat!("\"", env!("CARGO_PKG_NAME"), "\""));
-    libjpeg.define("VERSION", format!("\"{}\"", version()?).as_str());
-    libjpeg.define("BUILD", format!("\"{}\"", "HELLO").as_str());
-    let have_intin_h = try_build_c("#include <intrin.h>")?;
-    if have_intin_h {
-        libjpeg.define("HAVE_INTRIN_H", None);
-    }
-    if compiler.is_like_msvc() && have_intin_h {
-        if core::mem::size_of::<usize>() == 8 {
-            libjpeg.define("HAVE__BITSCANFORWARD", None);
-        } else {
-            libjpeg.define("HAVE__BITSCANFORWARD64", None);
+        if ctzl {
+            libjpeg.define("HAVE_BUILTIN_CTZL", None);
         }
-    }
-    let fallthrough = r##"
+        let compiler = libjpeg.get_compiler();
+        let inline = inline(&compiler, env("FORCE_INLINE", true))?;
+        libjpeg.define("INLINE", inline);
+        libjpeg.define(
+            "SIZEOF_SIZE_T",
+            itoa::Buffer::new().format(core::mem::size_of::<usize>()),
+        );
+        libjpeg.define("PACKAGE_NAME", concat!("\"", env!("CARGO_PKG_NAME"), "\""));
+        libjpeg.define("VERSION", format!("\"{}\"", version()?).as_str());
+        libjpeg.define("BUILD", format!("\"{}\"", "HELLO").as_str());
+        let have_intin_h = try_build_c("#include <intrin.h>")?;
+        if have_intin_h {
+            libjpeg.define("HAVE_INTRIN_H", None);
+        }
+        if compiler.is_like_msvc() && have_intin_h {
+            if core::mem::size_of::<usize>() == 8 {
+                libjpeg.define("HAVE__BITSCANFORWARD", None);
+            } else {
+                libjpeg.define("HAVE__BITSCANFORWARD64", None);
+            }
+        }
+        let fallthrough = r##"
 #if defined(__has_attribute)
 #if __has_attribute(fallthrough)
 #define FALLTHROUGH  __attribute__((fallthrough));
@@ -290,101 +293,97 @@ fn configure_jconfigint(mut libjpeg: cc::Build) -> Result<cc::Build> {
 #define FALLTHROUGH
 #endif
 "##;
-    std::fs::write(jconfigint, fallthrough.as_bytes())?;
+        std::fs::write(jconfigint, fallthrough.as_bytes())?;
 
-    Ok(libjpeg)
-}
-
-fn configure_jconfig(mut libjpeg: cc::Build) -> Result<cc::Build> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let jconfig = std::path::PathBuf::from(out_dir)
-        .join("libjpeg")
-        .join("jconfig.h");
-    let jpeg_lib_version = jpeg_lib_version()?;
-    libjpeg.define(
-        "JPEG_LIB_VERSION",
-        itoa::Buffer::new().format(jpeg_lib_version),
-    );
-    libjpeg.define("LIBJPEG_TURBO_VERSION", version()?.as_str());
-    let turbo_version = turbo_version()?;
-    libjpeg.define(
-        "LIBJPEG_TURBO_VERSION_NUMBER",
-        format!(
-            "\"{}{:0>3}{:0>3}\"",
-            turbo_version.0, turbo_version.1, turbo_version.2
-        )
-        .as_str(),
-    );
-    libjpeg.define("BITS_IN_JSAMPLE", "8");
-    std::fs::write(
-        jconfig,
-        "",
-        // b"#define MAXJSAMPLE 255
-        //                       typedef short JSAMPLE;",
-    )?;
-    Ok(libjpeg)
-}
-
-fn inline(compiler: &cc::Tool, force_inline: bool) -> Result<&'static str> {
-    let mut inline = if compiler.is_like_msvc() {
-        vec!["__inline;inline"]
-    } else {
-        vec!["__inline__;inline"]
-    };
-
-    if force_inline {
-        if compiler.is_like_msvc() {
-            inline.insert(0, "__forceinline");
-        } else {
-            inline.insert(0, "inline __attribute__((always_inline))");
-            inline.insert(0, "__inline__ __attribute__((always_inline))");
-        }
+        Ok(libjpeg)
     }
 
-    Ok(inline
-        .iter()
-        .map(|i| {
-            let code = format!(
-                "{i} static int foo(void) {{ return 0; }} int main(void) {{ return foo(); }}"
-            );
-            (i, try_build_c(&code))
-        })
-        // .flatten()
-        .find_map(|(code, compiled)| {
-            if let Ok(true) = compiled {
-                Some(code)
+    pub fn configure_jconfig(mut libjpeg: cc::Build) -> Result<cc::Build> {
+        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let jconfig = std::path::PathBuf::from(out_dir)
+            .join("libjpeg")
+            .join("jconfig.h");
+        let jpeg_lib_version = jpeg_lib_version()?;
+        libjpeg.define(
+            "JPEG_LIB_VERSION",
+            itoa::Buffer::new().format(jpeg_lib_version),
+        );
+        libjpeg.define("LIBJPEG_TURBO_VERSION", version()?.as_str());
+        let turbo_version = turbo_version()?;
+        libjpeg.define(
+            "LIBJPEG_TURBO_VERSION_NUMBER",
+            format!(
+                "\"{}{:0>3}{:0>3}\"",
+                turbo_version.0, turbo_version.1, turbo_version.2
+            )
+            .as_str(),
+        );
+        libjpeg.define("BITS_IN_JSAMPLE", "8");
+        std::fs::write(jconfig, "")?;
+        Ok(libjpeg)
+    }
+
+    fn inline(compiler: &cc::Tool, force_inline: bool) -> Result<&'static str> {
+        let mut inline = if compiler.is_like_msvc() {
+            vec!["__inline;inline"]
+        } else {
+            vec!["__inline__;inline"]
+        };
+
+        if force_inline {
+            if compiler.is_like_msvc() {
+                inline.insert(0, "__forceinline");
             } else {
-                None
+                inline.insert(0, "inline __attribute__((always_inline))");
+                inline.insert(0, "__inline__ __attribute__((always_inline))");
             }
-        })
-        .ok_or_else(|| -> Box<dyn std::error::Error> { "failed to find inline".into() })?)
-}
+        }
 
-fn try_build_c(c: &str) -> Result<bool> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let pwd = env::current_dir()?;
-    env::set_current_dir(&out_dir)?;
-    let mut config = cc::Build::new();
-    std::fs::write("test.c", c)?;
-    config.file("test.c");
-    env::set_current_dir(&pwd)?;
-    Ok(config.try_compile("test").is_ok())
-}
+        Ok(inline
+            .iter()
+            .map(|i| {
+                let code = format!(
+                    "{i} static int foo(void) {{ return 0; }} int main(void) {{ return foo(); }}"
+                );
+                (i, try_build_c(&code))
+            })
+            // .flatten()
+            .find_map(|(code, compiled)| {
+                if let Ok(true) = compiled {
+                    Some(code)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| -> Box<dyn std::error::Error> { "failed to find inline".into() })?)
+    }
 
-fn try_expand_c(c: &str) -> Result<String> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let pwd = env::current_dir()?;
-    env::set_current_dir(&out_dir)?;
-    let mut config = cc::Build::new();
-    std::fs::write("test.c", c)?;
-    config.file("test.c");
-    env::set_current_dir(&pwd)?;
-    Ok(String::from_utf8(config.try_expand()?)?)
-}
+    fn try_build_c(c: &str) -> Result<bool> {
+        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let pwd = env::current_dir()?;
+        env::set_current_dir(&out_dir)?;
+        let mut config = cc::Build::new();
+        std::fs::write("test.c", c)?;
+        config.file("test.c");
+        env::set_current_dir(&pwd)?;
+        Ok(config.try_compile("test").is_ok())
+    }
 
-fn env<T: std::str::FromStr>(var: &'static str, default: T) -> T {
-    std::env::var(var)
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(default)
+    fn try_expand_c(c: &str) -> Result<String> {
+        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let pwd = env::current_dir()?;
+        env::set_current_dir(&out_dir)?;
+        let mut config = cc::Build::new();
+        std::fs::write("test.c", c)?;
+        config.file("test.c");
+        env::set_current_dir(&pwd)?;
+        Ok(String::from_utf8(config.try_expand()?)?)
+    }
+
+    fn env<T: std::str::FromStr>(var: &'static str, default: T) -> T {
+        std::env::var(var)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default)
+    }
 }

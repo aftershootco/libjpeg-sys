@@ -9,11 +9,11 @@ links = "libjpeg"
 [dependencies]
 
 [build-dependencies]
-cc = "1.0.73"
-itoa = "1.0.4"
+cc = { version = "1.0.73", features = ["parallel"], optioal = true }
+itoa = { version = "1.0.4", optional = true }
 
 [features]
 default = ["build"] 
-build = ["clone"]
+build = ["dep:cc", "dep:itoa", "clone"]
 no-build = []
 clone = []
