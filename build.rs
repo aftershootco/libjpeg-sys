@@ -7,7 +7,7 @@ pub type Error = Box<dyn std::error::Error>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn main() -> Result<()> {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let out_dir = env::var("OUT_DIR")?;
 
     #[cfg(all(feature = "clone", not(feature = "no-build")))]
     clone(&out_dir)?;
@@ -126,12 +126,16 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     // );
     println!("cargo:rustc-link-lib=static=jpeg");
 
+    #[cfg(feature = "simd")]
+    compile::simd::simd()?;
     Ok(())
 }
 
 #[cfg(all(feature = "build", not(feature = "no-build")))]
 mod compile {
-    use super::*;
+    use std::path::PathBuf;
+
+    pub use super::*;
     #[derive(Clone, Copy, Eq, PartialEq, Debug)]
     pub enum JpegLib {
         Jpeg8,
@@ -152,7 +156,7 @@ mod compile {
     }
 
     pub fn version() -> Result<String> {
-        let out_dir = env::var_os("OUT_DIR").unwrap();
+        let out_dir = env::var("OUT_DIR")?;
         let file = BufReader::new(File::open(
             std::path::PathBuf::from(out_dir)
                 .join("libjpeg")
@@ -192,8 +196,7 @@ mod compile {
     }
 
     pub fn configure_jversion(mut libjpeg: cc::Build) -> Result<cc::Build> {
-        let out_dir = env::var_os("OUT_DIR").unwrap();
-        let jversion = std::path::PathBuf::from(out_dir)
+        let jversion = PathBuf::from(env::var("OUT_DIR")?)
             .join("libjpeg")
             .join("jversion.h");
 
@@ -243,7 +246,7 @@ mod compile {
 
         libjpeg.define(
             "JCOPYRIGHT_SHORT",
-            "\"Copyright (C) 1991-2020 The libjpeg-turbo Project and many others\"",
+            r#""Copyright (C) 1991-2020 The libjpeg-turbo Project and many others""#,
         );
 
         std::fs::write(jversion, "")?;
@@ -385,5 +388,125 @@ mod compile {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(default)
+    }
+
+    pub mod simd {
+        use super::*;
+        use std::path::PathBuf;
+
+        pub fn simd() -> Result<()> {
+            let target_arch = env::var("CARGO_CFG_TARGET_ARCH")?;
+            match target_arch.as_str() {
+                "x86_64" => simd_x86_64(),
+                "i386" => simd_i386(),
+                "aarch64" => simd_neon(),
+                _ => Err("Unsupported arch for simd".into()),
+            }
+        }
+
+        pub fn simd_x86_64() -> Result<()> {
+            let simd = PathBuf::from(std::env::var("OUT_DIR")?)
+                .join("libjpeg")
+                .join("simd");
+            env::set_current_dir(simd)?;
+            let asm_sources = [
+                "x86_64/jsimdcpu.asm",
+                "x86_64/jfdctflt-sse.asm",
+                "x86_64/jccolor-sse2.asm",
+                "x86_64/jcgray-sse2.asm",
+                "x86_64/jchuff-sse2.asm",
+                "x86_64/jcphuff-sse2.asm",
+                "x86_64/jcsample-sse2.asm",
+                "x86_64/jdcolor-sse2.asm",
+                "x86_64/jdmerge-sse2.asm",
+                "x86_64/jdsample-sse2.asm",
+                "x86_64/jfdctfst-sse2.asm",
+                "x86_64/jfdctint-sse2.asm",
+                "x86_64/jidctflt-sse2.asm",
+                "x86_64/jidctfst-sse2.asm",
+                "x86_64/jidctint-sse2.asm",
+                "x86_64/jidctred-sse2.asm",
+                "x86_64/jquantf-sse2.asm",
+                "x86_64/jquanti-sse2.asm",
+                "x86_64/jccolor-avx2.asm",
+                "x86_64/jcgray-avx2.asm",
+                "x86_64/jcsample-avx2.asm",
+                "x86_64/jdcolor-avx2.asm",
+                "x86_64/jdmerge-avx2.asm",
+                "x86_64/jdsample-avx2.asm",
+                "x86_64/jfdctint-avx2.asm",
+                "x86_64/jidctint-avx2.asm",
+                "x86_64/jquanti-avx2.asm",
+            ];
+            let mut simd = cc::Build::new();
+            simd.files(asm_sources);
+            simd.flag("-E");
+            simd.compile("sss");
+            Ok(())
+        }
+
+        pub fn simd_neon() -> Result<()> {
+            let sources = [
+                "arm/jcgray-neon.c",
+                "arm/jcphuff-neon.c",
+                "arm/jcsample-neon.c",
+                "arm/jdmerge-neon.c",
+                "arm/jdsample-neon.c",
+                "arm/jfdctfst-neon.c",
+                "arm/jidctred-neon.c",
+                "arm/jquanti-neon.c",
+            ];
+            Ok(())
+        }
+
+        pub fn simd_i386() -> Result<()> {
+            let asm_sources = [
+                "i386/jsimdcpu.asm",
+                "i386/jfdctflt-3dn.asm",
+                "i386/jidctflt-3dn.asm",
+                "i386/jquant-3dn.asm",
+                "i386/jccolor-mmx.asm",
+                "i386/jcgray-mmx.asm",
+                "i386/jcsample-mmx.asm",
+                "i386/jdcolor-mmx.asm",
+                "i386/jdmerge-mmx.asm",
+                "i386/jdsample-mmx.asm",
+                "i386/jfdctfst-mmx.asm",
+                "i386/jfdctint-mmx.asm",
+                "i386/jidctfst-mmx.asm",
+                "i386/jidctint-mmx.asm",
+                "i386/jidctred-mmx.asm",
+                "i386/jquant-mmx.asm",
+                "i386/jfdctflt-sse.asm",
+                "i386/jidctflt-sse.asm",
+                "i386/jquant-sse.asm",
+                "i386/jccolor-sse2.asm",
+                "i386/jcgray-sse2.asm",
+                "i386/jchuff-sse2.asm",
+                "i386/jcphuff-sse2.asm",
+                "i386/jcsample-sse2.asm",
+                "i386/jdcolor-sse2.asm",
+                "i386/jdmerge-sse2.asm",
+                "i386/jdsample-sse2.asm",
+                "i386/jfdctfst-sse2.asm",
+                "i386/jfdctint-sse2.asm",
+                "i386/jidctflt-sse2.asm",
+                "i386/jidctfst-sse2.asm",
+                "i386/jidctint-sse2.asm",
+                "i386/jidctred-sse2.asm",
+                "i386/jquantf-sse2.asm",
+                "i386/jquanti-sse2.asm",
+                "i386/jccolor-avx2.asm",
+                "i386/jcgray-avx2.asm",
+                "i386/jcsample-avx2.asm",
+                "i386/jdcolor-avx2.asm",
+                "i386/jdmerge-avx2.asm",
+                "i386/jdsample-avx2.asm",
+                "i386/jfdctint-avx2.asm",
+                "i386/jidctint-avx2.asm",
+                "i386/jquanti-avx2.asm",
+            ];
+            Ok(())
+        }
     }
 }
