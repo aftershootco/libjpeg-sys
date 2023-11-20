@@ -268,9 +268,10 @@ mod compile {
         jconfigint.write_all(b"#undef inline")?;
         let inline = inline(&compiler, env("FORCE_INLINE", true))?;
         jconfigint.define("INLINE", inline);
+        let target_pointer_width: u8 = env::var("CARGO_CFG_TARGET_POINTER_WIDTH")?.parse()?;
         jconfigint.define(
             "SIZEOF_SIZE_T",
-            itoa::Buffer::new().format(core::mem::size_of::<usize>()),
+            (target_pointer_width / 8).to_string().as_str(),
         );
 
         let thread_local = if compiler.is_like_msvc() {
@@ -298,13 +299,14 @@ mod compile {
             jconfigint.define("HAVE_INTRIN_H", None);
         }
         if compiler.is_like_msvc() && have_intin_h {
-            if core::mem::size_of::<usize>() == 8 {
-                jconfigint.define("HAVE__BITSCANFORWARD", None);
-            } else {
+            if target_pointer_width == 64 {
                 jconfigint.define("HAVE__BITSCANFORWARD64", None);
+            } else if target_pointer_width == 32 {
+                jconfigint.define("HAVE__BITSCANFORWARD", None);
             }
         }
-        let fallthrough = r##"
+        jconfigint.write_all(
+            br##"
 #if defined(__has_attribute)
 #if __has_attribute(fallthrough)
 #define FALLTHROUGH  __attribute__((fallthrough));
@@ -314,9 +316,8 @@ mod compile {
 #else
 #define FALLTHROUGH
 #endif
-"##;
-        use std::io::Write;
-        jconfigint.write_all(fallthrough.as_bytes())?;
+"##,
+        )?;
         jconfigint.write()?;
 
         Ok(())
@@ -330,10 +331,7 @@ mod compile {
         );
 
         let jpeg_lib_version = jpeg_lib_version()?;
-        jconfig.define(
-            "JPEG_LIB_VERSION",
-            itoa::Buffer::new().format(jpeg_lib_version),
-        );
+        jconfig.define("JPEG_LIB_VERSION", jpeg_lib_version.to_string().as_str());
 
         jconfig.define("LIBJPEG_TURBO_VERSION", version()?.as_str());
         let turbo_version = turbo_version()?;

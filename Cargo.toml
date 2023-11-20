@@ -9,11 +9,9 @@ links = "jpeg"
 [lib]
 name = "jpeg"
 crate-type = ["staticlib", "cdylib", "rlib"]
-links = "jpeg"
 
 [build-dependencies]
 cc = { version = "1.0.73", features = ["parallel"] }
-itoa = { version = "1.0.4" }
 # sorse = { version = "0.1.0", registry = "ktra" }
 sorse = { path = "../sorse/" }
 
