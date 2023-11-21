@@ -1,10 +1,11 @@
+use anyhow::{Error, Result};
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::str::FromStr;
-pub type Error = Box<dyn std::error::Error>;
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+// pub type Error = Box<dyn std::error::Error>;
+// pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 static MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -146,13 +147,13 @@ mod compile {
     }
 
     impl FromStr for JpegLib {
-        type Err = String;
+        type Err = Error;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
                 "jpeg8" => Ok(JpegLib::Jpeg8),
                 "jpeg7" => Ok(JpegLib::Jpeg7),
-                _ => Err(format!("Unknown jpeg lib: {}", s)),
+                _ => Err(anyhow::anyhow!("Unknown jpeg lib: {}", s)),
             }
         }
     }
@@ -169,10 +170,10 @@ mod compile {
                     .strip_prefix("set(VERSION ")
                     .and_then(|s| s.strip_suffix(')'))
                     .map(|s| s.to_string())
-                    .ok_or_else(|| "Unable to get version from CMakeLists.txt".into());
+                    .ok_or_else(|| anyhow::anyhow!("Unable to get version from CMakeLists.txt"));
             }
         }
-        Err("Unable to get version from CMakeLists.txt".into())
+        anyhow::bail!("Unable to get version from CMakeLists.txt")
     }
 
     fn turbo_version() -> Result<(u32, u32, u32)> {
@@ -411,7 +412,7 @@ mod compile {
                     None
                 }
             })
-            .ok_or_else(|| -> Box<dyn std::error::Error> { "failed to find inline".into() })?)
+            .ok_or_else(|| anyhow::anyhow!("failed to find inline"))?)
     }
 
     fn try_build_c(c: &str) -> Result<bool> {
@@ -454,19 +455,15 @@ mod compile {
         pub fn simd() -> Result<(PathBuf, String)> {
             let target_arch = env::var("CARGO_CFG_TARGET_ARCH")?;
             match target_arch.as_str() {
-                "x86_64" => todo!(),
+                "x86_64" => simd_x86_64(),
                 "i386" => todo!(),
                 "aarch64" => simd_neon(),
-                _ => Err("Unsupported arch for simd".into()),
+                _ => Err(anyhow::anyhow!("Unsupported arch for simd")),
             }
         }
 
-        pub fn simd_x86_64() -> Result<()> {
-            let simd = PathBuf::from(std::env::var("OUT_DIR")?)
-                .join("libjpeg")
-                .join("simd");
-            env::set_current_dir(simd)?;
-            let asm_sources = [
+        pub fn simd_x86_64() -> Result<(PathBuf, String)> {
+            let sources = [
                 "x86_64/jsimdcpu.asm",
                 "x86_64/jfdctflt-sse.asm",
                 "x86_64/jccolor-sse2.asm",
@@ -495,11 +492,25 @@ mod compile {
                 "x86_64/jidctint-avx2.asm",
                 "x86_64/jquanti-avx2.asm",
             ];
+
+            let sources: Vec<PathBuf> = sources
+                .iter()
+                .map(|s| {
+                    PathBuf::from(MANIFEST_DIR)
+                        .join("vendor")
+                        .join("simd")
+                        .join(s)
+                })
+                .collect();
+
+            // let sources = sources.iter_mut().map(|src| {
+            // });
+
             let mut simd = cc::Build::new();
-            simd.files(asm_sources);
+            simd.files(sources);
             simd.flag("-E");
-            simd.compile("sss");
-            Ok(())
+            simd.compile("sus");
+            todo!()
         }
 
         pub fn simd_neon() -> Result<(PathBuf, String)> {
