@@ -17,13 +17,11 @@ pub fn main() -> Result<()> {
         // .build_arg(format!("-j{}", std::thread::available_parallelism()?.get()))
         .build();
 
-    println!(
-        "cargo:rustc-link-search={}",
-        dst.join("lib").display()
-    );
-    println!("cargo:rustc-link-lib=static=jpeg");
+    println!("cargo:rustc-link-search={}", dst.join("lib").display());
+    let name = if cfg!(unix) { "jpeg" } else { "jpeg-static" };
 
+    println!("cargo:rustc-link-lib=static={name}");
     println!("cargo:include={}", dst.join("include").display());
-
+    println!("cargo:name={name}");
     Ok(())
 }
