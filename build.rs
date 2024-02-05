@@ -18,10 +18,12 @@ pub fn main() -> Result<()> {
         .build();
 
     println!(
-        "cargo:rustc-link-search=static={}",
+        "cargo:rustc-link-search={}",
         dst.join("lib").display()
     );
     println!("cargo:rustc-link-lib=static=jpeg");
+
+    println!("cargo:include={}", dst.join("include").display());
 
     Ok(())
 }

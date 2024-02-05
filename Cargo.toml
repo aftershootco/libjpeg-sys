@@ -7,7 +7,7 @@ license = "MIT"
 links = "jpeg"
 
 [lib]
-name = "jpeg"
+name = "libjpeg"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
