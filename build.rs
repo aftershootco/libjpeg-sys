@@ -14,7 +14,7 @@ pub fn main() -> Result<()> {
         // ON
         .define("WITH_JPEG8", "ON")
         .define("ENABLE_STATIC", "ON")
-        .build_arg(format!("-j{}", std::thread::available_parallelism()?.get()))
+        // .build_arg(format!("-j{}", std::thread::available_parallelism()?.get()))
         .build();
 
     println!(
