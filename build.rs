@@ -5,8 +5,12 @@ use std::{env, path::PathBuf};
 const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 pub fn main() -> Result<()> {
-    // let out_dir = env::var("OUT_DIR")?;
-    let dst = Config::new(PathBuf::from(MANIFEST_DIR).join("vendor"))
+    let vendor = PathBuf::from(MANIFEST_DIR).join("vendor");
+    anyhow::ensure!(
+        vendor.exists(),
+        "`{vendor:?}` folder not found, please run `git submodule update --init`"
+    );
+    let dst = Config::new(vendor)
         // OFF
         .define("WITH_JAVA", "OFF")
         .define("ENABLE_SHARED", "OFF")
