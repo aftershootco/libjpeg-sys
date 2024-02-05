@@ -12,18 +12,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 anyhow = "1.0.75"
-bindgen = "0.69.1"
 cmake = "0.1.50"
-nasm-rs = { version = "0.2.5", features = ["parallel"] }
-# sorse = { version = "0.1.0", registry = "ktra" }
-sorse = { path = "../sorse/" }
 
 [features]
-default = ["build", "simd"] 
-jpeg80_abi = ["jpeg70_abi"]
-jpeg70_abi = ["arith_dec", "arith_enc"]
-arith_enc = []
-arith_dec = []
-jpegtran = []
-simd = []
-build = []
