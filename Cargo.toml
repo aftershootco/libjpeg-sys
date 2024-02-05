@@ -19,11 +19,13 @@ nasm-rs = { version = "0.2.5", features = ["parallel"] }
 sorse = { path = "../sorse/" }
 
 [features]
-default = ["build", "simd"] 
+default = ["simd"] 
+bindgen = []
 jpeg80_abi = ["jpeg70_abi"]
 jpeg70_abi = ["arith_dec", "arith_enc"]
 arith_enc = []
 arith_dec = []
 jpegtran = []
 simd = []
-build = []
+c_lossless = []
+d_lossless = []

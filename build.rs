@@ -4,97 +4,146 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::str::FromStr;
-// pub type Error = Box<dyn std::error::Error>;
-// pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-static MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 pub fn main() -> Result<()> {
     let out_dir = env::var("OUT_DIR")?;
 
-    #[cfg(all(feature = "build", not(feature = "no-build")))]
     build(&out_dir)?;
+
+    // compile::configure_jconfigint().expect("Configure jconfigint.h");
+    // compile::configure_jversion().expect("Configure jversion.h");
+    // compile::configure_jconfig().expect("Configure jconfig.h");
+    bindgen::builder()
+        .header(format!("{MANIFEST_DIR}/vendor/jpeglib.h"))
+        .generate()
+        .expect("Unable to generate bindings");
 
     Ok(())
 }
 
-#[cfg(all(feature = "build", not(feature = "no-build")))]
 pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
     use std::path::PathBuf;
 
     env::set_current_dir(&out_dir)?;
 
     let mut libjpeg = cc::Build::new();
+    libjpeg.flag("-Wno-unused-parameter");
+    libjpeg.flag("-Wno-unused-variable");
+    libjpeg.flag("-Wno-shift-negative-value");
 
     std::fs::create_dir_all(out_dir.as_ref().join("configured"))
         .expect("Failed to create configured dir");
-    compile::configure_jconfigint().expect("Configure jconfigint.h");
-    compile::configure_jversion().expect("Configure jversion.h");
-    compile::configure_jconfig().expect("Configure jconfig.h");
+    // compile::configure_jconfigint().expect("Configure jconfigint.h");
+    // compile::configure_jversion().expect("Configure jversion.h");
+    // compile::configure_jconfig().expect("Configure jconfig.h");
     libjpeg.include(out_dir.as_ref().join("configured"));
     libjpeg.include(std::path::PathBuf::from(MANIFEST_DIR).join("vendor"));
 
-    // libjpeg.file("libjpeg/jpeglib.h");
-    // std::fs::write("/tmp/file.txt", libjpeg.expand())?;
     let sources = [
-        "vendor/jcapimin.c",
-        "vendor/jcapistd.c",
-        "vendor/jccoefct.c",
-        "vendor/jccolor.c",
-        "vendor/jcdctmgr.c",
-        "vendor/jchuff.c",
-        "vendor/jcicc.c",
-        "vendor/jcinit.c",
-        "vendor/jcmainct.c",
-        "vendor/jcmarker.c",
-        "vendor/jcmaster.c",
-        "vendor/jcomapi.c",
-        "vendor/jcparam.c",
-        "vendor/jcphuff.c",
-        "vendor/jcprepct.c",
-        "vendor/jcsample.c",
-        "vendor/jctrans.c",
-        "vendor/jdapimin.c",
-        "vendor/jdapistd.c",
-        "vendor/jdatadst.c",
-        "vendor/jdatasrc.c",
-        "vendor/jdcoefct.c",
-        "vendor/jdcolor.c",
-        "vendor/jddctmgr.c",
-        "vendor/jdhuff.c",
-        "vendor/jdicc.c",
-        "vendor/jdinput.c",
-        "vendor/jdmainct.c",
-        "vendor/jdmarker.c",
-        "vendor/jdmaster.c",
-        "vendor/jdmerge.c",
-        "vendor/jdphuff.c",
-        "vendor/jdpostct.c",
-        "vendor/jdsample.c",
-        "vendor/jdtrans.c",
-        "vendor/jerror.c",
-        "vendor/jfdctflt.c",
-        "vendor/jfdctfst.c",
-        "vendor/jfdctint.c",
-        "vendor/jidctflt.c",
-        "vendor/jidctfst.c",
-        "vendor/jidctint.c",
-        "vendor/jidctred.c",
-        "vendor/jquant1.c",
-        "vendor/jquant2.c",
-        "vendor/jutils.c",
-        "vendor/jmemmgr.c",
-        "vendor/jmemnobs.c",
+        "jcapimin.c",
+        "jcapistd.c",
+        "jccoefct.c",
+        "jccolor.c",
+        "jcdctmgr.c",
+        "jcdiffct.c",
+        "jchuff.c",
+        "jcicc.c",
+        "jcinit.c",
+        "jclhuff.c",
+        "jclossls.c",
+        "jcmainct.c",
+        "jcmarker.c",
+        "jcmaster.c",
+        "jcomapi.c",
+        "jcparam.c",
+        "jcphuff.c",
+        "jcprepct.c",
+        "jcsample.c",
+        "jctrans.c",
+        "jdapimin.c",
+        "jdapistd.c",
+        "jdatadst.c",
+        "jdatasrc.c",
+        "jdcoefct.c",
+        "jdcolor.c",
+        "jddctmgr.c",
+        "jddiffct.c",
+        "jdhuff.c",
+        "jdicc.c",
+        "jdinput.c",
+        "jdlhuff.c",
+        "jdlossls.c",
+        "jdmainct.c",
+        "jdmarker.c",
+        "jdmaster.c",
+        "jdmerge.c",
+        "jdphuff.c",
+        "jdpostct.c",
+        "jdsample.c",
+        "jdtrans.c",
+        "jerror.c",
+        "jfdctflt.c",
+        "jfdctfst.c",
+        "jfdctint.c",
+        "jidctflt.c",
+        "jidctfst.c",
+        "jidctint.c",
+        "jidctred.c",
+        "jquant1.c",
+        "jquant2.c",
+        "jutils.c",
+        "jmemmgr.c",
+        "jmemnobs.c",
     ];
 
-    let sources = sources
-        .into_iter()
-        .map(|p| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(p));
-    libjpeg.files(sources);
-    // libjpeg.file("libjpeg/jsimd.c");
+    let jpeg12 = [
+        "jcapistd.c",
+        "jccoefct.c",
+        "jccolor.c",
+        "jcdctmgr.c",
+        "jcdiffct.c",
+        "jclossls.c",
+        "jcmainct.c",
+        "jcprepct.c",
+        "jcsample.c",
+        "jdapistd.c",
+        "jdcoefct.c",
+        "jdcolor.c",
+        "jddctmgr.c",
+        "jddiffct.c",
+        "jdlossls.c",
+        "jdmainct.c",
+        "jdmerge.c",
+        "jdpostct.c",
+        "jdsample.c",
+        "jfdctfst.c",
+        "jfdctint.c",
+        "jidctflt.c",
+        "jidctfst.c",
+        "jidctint.c",
+        "jidctred.c",
+        "jquant1.c",
+        "jquant2.c",
+        "jutils.c",
+    ];
 
-    #[cfg(feature = "simd")]
-    let simd = compile::simd::simd()?;
+    let sources = sources.into_iter().map(|p| {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("vendor")
+            .join(p)
+    });
+
+    let jpeg12_source = jpeg12.into_iter().map(|p| {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("vendor")
+            .join(p)
+    });
+
+    // Build and link to jpeg12
+    compile::jpeg(jpeg12_source, compile::BitsInJSample::Bits12)?;
+    libjpeg.files(sources);
 
     println!(
         "cargo:include={}",
@@ -107,34 +156,27 @@ pub fn build(out_dir: impl AsRef<Path>) -> Result<()> {
 
     // libjpeg.flag(&format!("-L{}", simd.0.to_string_lossy()));
     // libjpeg.flag(&format!("-l{}", simd.1));
-    println!(
-        "cargo:rustc-link-search=native={}",
-        simd.0.to_string_lossy()
-    );
-    println!("cargo:rustc-link-lib=static={}", simd.1);
     libjpeg.flag("-Wno-unused-parameter");
     libjpeg.flag("-Wno-unused-variable");
     libjpeg.flag("-Wno-shift-negative-value");
 
     // #[cfg(feature = "simd")]
-    libjpeg.define("WITH_SIMD", None);
+    // #[cfg(feature = "simd")]
+    // {
+    //     let simd = compile::simd::simd()?;
+    //     libjpeg.define("WITH_SIMD", None);
+    //     println!(
+    //         "cargo:rustc-link-search=native={}",
+    //         simd.0.to_string_lossy()
+    //     );
+    //     println!("cargo:rustc-link-lib=static={}", simd.1);
+    // }
 
     libjpeg.compile("jpeg");
-    println!(
-        "cargo:rustc-link-search=native={}",
-        out_dir.as_ref().join("lib").display()
-    );
 
-    // println!(
-    //     "cargo:rustc-link-search=native={}",
-    //     libjpeg.join("lib").display()
-    // );
-
-    println!("cargo:rustc-link-lib=static=jpeg");
     Ok(())
 }
 
-#[cfg(all(feature = "build", not(feature = "no-build")))]
 mod compile {
     use std::io::Write;
     use std::path::PathBuf;
@@ -144,6 +186,35 @@ mod compile {
     pub enum JpegLib {
         Jpeg8,
         Jpeg7,
+    }
+
+    #[derive(Clone, Copy, Eq, PartialEq, Debug)]
+    #[repr(u8)]
+    pub enum BitsInJSample {
+        Bits8 = 8,
+        Bits12 = 12,
+        Bits16 = 16,
+    }
+
+    pub fn jpeg<P: AsRef<Path>>(
+        sources: impl IntoIterator<Item = P>,
+        bits: BitsInJSample,
+    ) -> Result<()> {
+        let mut cc = cc::Build::new();
+        cc.flag("-Wno-unused-parameter");
+        cc.flag("-Wno-unused-variable");
+        cc.flag("-Wno-shift-negative-value");
+        cc.define("BITS_IN_JSAMPLE", (bits as u8).to_string().as_str());
+        cc.static_flag(true);
+        cc.files(sources);
+        // cc.cargo_metadata(false);
+        let name = format!("jpeg{}", bits as u8);
+        cc.try_compile(&name)?;
+        // Ok(PathBuf::from(
+        //     std::env::var_os("OUT_DIR").ok_or_else(|| anyhow::anyhow!("OUT_DIR not set"))?,
+        // )
+        // .join(format!("lib{}.a", name)))
+        Ok(())
     }
 
     impl FromStr for JpegLib {
@@ -194,7 +265,7 @@ mod compile {
         }
     }
 
-    pub fn configure_jversion() -> Result<()> {
+    pub fn configure_jversion() -> Result<PathBuf> {
         let mut jversion = sorse::SorseHeader::new(
             PathBuf::from(env::var("OUT_DIR")?)
                 .join("configured")
@@ -213,36 +284,23 @@ mod compile {
                 jversion.define("JVERSION", "\"6b  27-Mar-1998\"");
             }
         }
-        // #define JCOPYRIGHT \
-        //   "Copyright (C) 2009-2022 D. R. Commander\n" \
-        //   "Copyright (C) 2015, 2020 Google, Inc.\n" \
-        //   "Copyright (C) 2019-2020 Arm Limited\n" \
-        //   "Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
-        //   "Copyright (C) 2011-2016 Siarhei Siamashka\n" \
-        //   "Copyright (C) 2015 Intel Corporation\n" \
-        //   "Copyright (C) 2013-2014 Linaro Limited\n" \
-        //   "Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
-        //   "Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
-        //   "Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
-        //   "Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
-        //   "Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
 
         jversion.define(
-            "JCOPYRIGHT \\",
+            "JCOPYRIGHT",
             r#"
-"Copyright (C) 2009-2022 D. R. Commander\n" \
-"Copyright (C) 2015, 2020 Google, Inc.\n" \
-"Copyright (C) 2019-2020 Arm Limited\n" \
-"Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
-"Copyright (C) 2011-2016 Siarhei Siamashka\n" \
-"Copyright (C) 2015 Intel Corporation\n" \
-"Copyright (C) 2013-2014 Linaro Limited\n" \
-"Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
-"Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
-"Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
-"Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
-"Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
-"#,
+                    "Copyright (C) 2009-2022 D. R. Commander\n" \
+                    "Copyright (C) 2015, 2020 Google, Inc.\n" \
+                    "Copyright (C) 2019-2020 Arm Limited\n" \
+                    "Copyright (C) 2015-2016, 2018 Matthieu Darbois\n" \
+                    "Copyright (C) 2011-2016 Siarhei Siamashka\n" \
+                    "Copyright (C) 2015 Intel Corporation\n" \
+                    "Copyright (C) 2013-2014 Linaro Limited\n" \
+                    "Copyright (C) 2013-2014 MIPS Technologies, Inc.\n" \
+                    "Copyright (C) 2009, 2012 Pierre Ossman for Cendio AB\n" \
+                    "Copyright (C) 2009-2011 Nokia Corporation and/or its subsidiary(-ies)\n" \
+                    "Copyright (C) 1999-2006 MIYASAKA Masaru\n" \
+                    "Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding"
+                "#,
         );
 
         jversion.define(
@@ -251,10 +309,10 @@ mod compile {
         );
 
         jversion.write()?;
-        Ok(())
+        Ok(jversion.path)
     }
 
-    pub fn configure_jconfigint() -> Result<()> {
+    pub fn configure_jconfigint() -> Result<PathBuf> {
         let mut jconfigint = sorse::SorseHeader::new(
             PathBuf::from(env::var("OUT_DIR")?)
                 .join("configured")
@@ -282,7 +340,7 @@ mod compile {
         };
         jconfigint.define("THREAD_LOCAL", thread_local);
         if try_build_c(&format!(
-            "${thread_local} int i;  int main(void) {{ i = 0;  return i; }}"
+            "{thread_local} int i;  int main(void) {{ i = 0;  return i; }}"
         ))
         .is_ok()
         {
@@ -308,23 +366,23 @@ mod compile {
         }
         jconfigint.write_all(
             br##"
-#if defined(__has_attribute)
-#if __has_attribute(fallthrough)
-#define FALLTHROUGH  __attribute__((fallthrough));
-#else
-#define FALLTHROUGH
-#endif
-#else
-#define FALLTHROUGH
-#endif
-"##,
+                    #if defined(__has_attribute)
+                    #if __has_attribute(fallthrough)
+                    #define FALLTHROUGH  __attribute__((fallthrough));
+                    #else
+                    #define FALLTHROUGH
+                    #endif
+                    #else
+                    #define FALLTHROUGH
+                    #endif
+                "##,
         )?;
         jconfigint.write()?;
 
-        Ok(())
+        Ok(jconfigint.path)
     }
 
-    pub fn configure_jconfig() -> Result<()> {
+    pub fn configure_jconfig() -> Result<PathBuf> {
         let mut jconfig = sorse::SorseHeader::new(
             PathBuf::from(env::var("OUT_DIR")?)
                 .join("configured")
@@ -376,8 +434,9 @@ mod compile {
         }
 
         jconfig.define("BITS_IN_JSAMPLE", "8");
+        // jconfig.define("JCONFIG_INCLUDED", None);
         jconfig.write()?;
-        Ok(())
+        Ok(jconfig.path)
     }
 
     fn inline(compiler: &cc::Tool, force_inline: bool) -> Result<&'static str> {
@@ -420,9 +479,9 @@ mod compile {
         let pwd = env::current_dir()?;
         env::set_current_dir(out_dir)?;
         let mut config = cc::Build::new();
-        // config.flag("-Wno-unused-parameter");
-        // config.flag("-Wno-unused-variable");
-        // config.flag("-Wno-shift-negative-value");
+        config.flag("-Wno-unused-parameter");
+        config.flag("-Wno-unused-variable");
+        config.flag("-Wno-shift-negative-value");
         std::fs::write("test.c", c)?;
         config.file("test.c");
         env::set_current_dir(pwd)?;
@@ -520,6 +579,8 @@ mod compile {
             neon.flag("-Wno-shift-negative-value");
             neon.include(PathBuf::from(MANIFEST_DIR).join("vendor"));
             neon.include(PathBuf::from(env::var("OUT_DIR")?).join("configured"));
+            // neon.define("BITS_IN_JSAMPLE", "8");
+            // neon.define("JCONFIG_INCLUDED", None);
 
             let mut simd_sources = vec![
                 "arm/jcgray-neon.c",
